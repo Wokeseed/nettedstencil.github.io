@@ -117,18 +117,30 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      max-width: 100%; /* Ensure the modal does not exceed the viewport width */
+      margin: 0;
+    }
+    .modal-content {
+      width: 100%; /* Take full width of the viewport */
+      max-height: 85vh; /* Ensure the modal does not exceed the viewport height */
+      overflow: auto; /* Allow scrolling if content overflows */
     }
     .modal-body {
       display: flex;
       justify-content: center;
       align-items: center;
-      max-height: calc(100vh - 120px); /* Adjust based on header/footer height */
+      max-height: calc(85vh - 60px); /* Adjust based on header/footer height */
       overflow: auto; /* Allow scrolling if content overflows */
     }
     .modal-body img {
       max-width: 100%;
       max-height: 100%;
       display: block;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
   </style>
 </head>
@@ -143,12 +155,12 @@
     </div>
     <div class="canvas-container">
       <div class="canvas-wrapper">
-        <button id="exportInvertedBtn" class="btn btn-secondary btn-sm">Choose Inverted Stencil</button>
+        <a id="downloadProcessedBtn" class="btn btn-secondary btn-sm" download="processed_stencil.svg">Download Processed Stencil</a>
         <div class="info-text">↓ What it sprays ↓</div>
         <canvas id="processedCanvas" width="600" height="800" style="width: 300px; height: 400px;"></canvas>
       </div>
       <div class="canvas-wrapper">
-        <button id="exportBtn" class="btn btn-success btn-sm">Choose Stencil</button>
+        <a id="downloadInvertedBtn" class="btn btn-success btn-sm" download="inverted_stencil.svg">Download Inverted Stencil</a>
         <div class="info-text">↓ Your stencil ↓</div>
         <canvas id="invertedCanvas" width="600" height="800" style="width: 300px; height: 400px;"></canvas>
       </div>
@@ -302,8 +314,23 @@
             scaleAndCenterImage(invertedImgWithBorder, invertedCanvas);
             invertedImage = invertedImgWithBorder;
             invertedCanvas.add(invertedImgWithBorder);
+
+            // Automatically convert to SVG and update download links
+            updateSVGDownloadLinks();
           });
         };
+      }
+
+      function updateSVGDownloadLinks() {
+        convertToSVG(processedCanvas.toDataURL('image/png'), function(svg) {
+          document.getElementById('downloadProcessedBtn').href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+          displaySVGInCanvas(svg, processedCanvas);
+        });
+
+        convertToSVG(invertedCanvas.toDataURL('image/png'), function(svg) {
+          document.getElementById('downloadInvertedBtn').href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+          displaySVGInCanvas(svg, invertedCanvas);
+        });
       }
 
       fileInput.addEventListener('change', function(e) {
@@ -322,29 +349,8 @@
           aspectRatio: NaN,
           viewMode: 1,
           autoCropArea: 1,
-          movable: false,
-          zoomable: false,
-          rotatable: false,
-          scalable: false,
-          cropBoxResizable: true,
-          dragMode: 'none',
-          cropBoxMovable: true,
           ready: function () {
-            // Ensure the crop box is properly centered and fits within the modal
-            var cropperInstance = this.cropper;
-            var containerData = cropperInstance.getContainerData();
-            var cropBoxData = cropperInstance.getCropBoxData();
-            var aspectRatio = cropBoxData.width / cropBoxData.height;
-
-            var newCropBoxWidth = containerData.width * 0.9;
-            var newCropBoxHeight = newCropBoxWidth / aspectRatio;
-
-            cropperInstance.setCropBoxData({
-              width: newCropBoxWidth,
-              height: newCropBoxHeight,
-              left: (containerData.width - newCropBoxWidth) / 2,
-              top: (containerData.height - newCropBoxHeight) / 2
-            });
+            this.cropper.setCropBoxData(this.cropper.getCanvasData());
           }
         });
         addTouchListeners();
@@ -391,34 +397,6 @@
         bottomOriginalImage = null;
       }
 
-      document.getElementById('exportBtn').onclick = function() {
-        var dataURL = invertedCanvas.toDataURL('image/png');
-        convertToSVG(dataURL, displayExportedStencil);
-      };
-
-      document.getElementById('exportInvertedBtn').onclick = function() {
-        var dataURL = processedCanvas.toDataURL('image/png');
-        convertToSVG(dataURL, displayExportedStencil);
-      };
-
-      function displayExportedStencil(svg) {
-        // Create an image element to display the SVG
-        var svgImage = new Image();
-        svgImage.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-        svgImage.style.marginTop = '20px';
-        svgImage.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.1)';
-        exportContainer.innerHTML = ''; // Clear previous images
-        exportContainer.appendChild(svgImage);
-
-        var downloadLink = document.createElement('a');
-        downloadLink.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-        downloadLink.download = 'stencil.svg';
-        downloadLink.textContent = 'Download Stencil';
-        downloadLink.className = 'btn btn-primary';
-        downloadLink.style.marginTop = '10px';
-        exportContainer.appendChild(downloadLink);
-      }
-
       function convertToSVG(dataURL, callback) {
         var formData = new FormData();
         formData.append('image', dataURLToBlob(dataURL), 'image.png');
@@ -430,6 +408,15 @@
         .then(response => response.text())
         .then(svg => callback(svg))
         .catch(error => console.error('Error:', error));
+      }
+
+      function displaySVGInCanvas(svg, canvas) {
+        fabric.loadSVGFromString(svg, function(objects, options) {
+          var obj = fabric.util.groupSVGElements(objects, options);
+          scaleAndCenterImage(obj, canvas);
+          canvas.clear();
+          canvas.add(obj);
+        });
       }
 
       function dataURLToBlob(dataURL) {
