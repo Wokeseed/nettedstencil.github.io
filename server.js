@@ -18,6 +18,7 @@ app.post('/upload', upload.single('image'), (req, res) => {
 
   potrace.trace(filePath, { threshold: 128 }, (err, svg) => {
     if (err) {
+      console.error('Error processing image:', err);
       res.status(500).send('Error processing image');
       return;
     }
@@ -31,6 +32,8 @@ app.post('/upload', upload.single('image'), (req, res) => {
   });
 });
 
-app.listen(3000, () => {
-  console.log('Server is running on port 3000');
+// Ensure the app listens on the port provided by Heroku
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
